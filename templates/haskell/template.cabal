@@ -42,7 +42,7 @@ maintainer:         brendandeleeuw@gmail.com
 
 -- A copyright notice.
 -- copyright:
-category:           Demo
+category:           Simulation
 build-type:         Simple
 
 -- Extra doc files to be distributed with the package, such as a CHANGELOG or a README.
