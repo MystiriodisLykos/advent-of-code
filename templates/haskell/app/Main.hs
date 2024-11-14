@@ -55,14 +55,35 @@ import Graphics.Gloss
     text,
     white,
     yellow,
+    circle,
+    rectangleWire,
+    pictures,
+    line,
+    translate
   )
 import qualified Graphics.Gloss.Interface.IO.Simulate as S
 
-simulation :: SF () Picture
-simulation =
+arrGraph :: Picture
+arrGraph = pictures [ circle 20
+                    , rectangleWire 80 70
+                    , line [(-80, 0), (-20, 0)]
+                    , line [(20, 0), (80, 0)]
+                    , polygon [(-80, 0), (-100, -10), (-100, 10)]
+                    , polygon [(80, 10), (80, -10), ( 100, 0)]
+                    ]
+
+showTime :: SF () Picture
+showTime =
   proc _ -> do
     p <- integral -< (1 :: Double)
-    Arrow.returnA -< text $ show p -- translate t t arrGraph
+    Arrow.returnA -< text $ show p
+
+showCircle :: SF () Picture
+showCircle = Arrow.arr $ const $ circle 20
+
+simulation :: SF () Picture
+simulation = kSwitch showCircle ((time >>^ ((<) 2)) >>> edge) (\_ _ -> showTime)
+
 
 main :: IO ()
 main =
