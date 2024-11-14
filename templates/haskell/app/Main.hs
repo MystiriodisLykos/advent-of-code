@@ -8,17 +8,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-import Control.Arrow
-  ( arr,
-    first,
-    returnA,
-    second,
-    (&&&),
-    (***),
-    (>>>),
-    (>>^),
-    (^>>),
-  )
+import Control.Arrow as Arrow
+
 import Control.Monad (when)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Debug.Trace (trace)
@@ -70,7 +61,8 @@ import qualified Graphics.Gloss.Interface.IO.Simulate as S
 simulation :: SF () Picture
 simulation =
   proc _ -> do
-    returnA -< text "Test"
+    p <- integral -< (1 :: Double)
+    Arrow.returnA -< text $ show p -- translate t t arrGraph
 
 main :: IO ()
 main =
@@ -101,16 +93,16 @@ simulateYampa display color frequency mainSF = do
           return False
       )
       mainSF
-  let toPic :: DTime -> IO Picture
+  let toPic :: (DTime, DTime) -> IO Picture
       toPic = const $ readIORef picRef
-      stepWorld :: S.ViewPort -> Float -> DTime -> IO DTime
-      stepWorld _ delta timeAcc
+      stepWorld :: S.ViewPort -> Float -> (DTime, DTime) -> IO (DTime, DTime)
+      stepWorld _ delta (timeAcc, timeTotal)
         | delta' > 0 = do
-            _ <- react handle (delta', Nothing)
-            return 0.0
-        | otherwise = return (-delta')
+            let delta'' = if timeTotal < (-5) then -delta' else delta'
+            _ <- react handle (delta'', Nothing)
+            return (0.0, timeTotal')
+        | otherwise = return (-delta', timeTotal')
         where
-          delta' = realToFrac delta - timeAcc -- An action to convert the world to a picture
-          -- A function to step the world one iteration. It is passed the period of
-          -- time (in seconds) needing to be advanced
-  S.simulateIO display color frequency 0 toPic stepWorld
+          delta' = realToFrac delta - timeAcc
+          timeTotal' = realToFrac (-delta) + timeTotal
+  S.simulateIO display color frequency (0, 0) toPic stepWorld
