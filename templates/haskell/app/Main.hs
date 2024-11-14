@@ -79,11 +79,20 @@ showTime =
     Arrow.returnA -< text $ show p
 
 showCircle :: SF () Picture
-showCircle = Arrow.arr $ const $ circle 20
+showCircle = proc _ -> do
+  p <- integral -< 100
+  Arrow.returnA -< translate p 0 $ circle 20
+
+kSwitchR :: SF a b -> SF (a, b) (Event c) -> (SF a b -> c -> SF a b) -> SF a b
+kSwitchR sf e f = kSwitch sf e cont
+  where
+    cont sf' c = rHctiwsK sf' $ f sf' c
+    rHctiwsK sf' sf'' = kSwitch sf'' e' (\_ _ -> kSwitchR sf' e f)
+    e' = ((time >>^ ((>) 0)) >>> edge)
 
 simulation :: SF () Picture
-simulation = kSwitch showCircle ((time >>^ ((<) 2)) >>> edge) (\_ _ -> showTime)
-
+simulation = (kSwitchR showCircle ((time >>^ ((<) 2)) >>> edge) (\_ _ -> showTime)) &&&
+  (showTime >>^ translate 0 100) >>^ (\(a, b) -> pictures [a, b])
 
 main :: IO ()
 main =
