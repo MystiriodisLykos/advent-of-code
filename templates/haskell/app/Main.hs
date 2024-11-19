@@ -13,6 +13,7 @@ import Control.Arrow as Arrow
 import Control.Monad (when)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Debug.Trace (trace)
+import GHC.Float (double2Float)
 import FRP.Yampa
   ( DTime,
     Event (Event, NoEvent),
@@ -42,11 +43,14 @@ import FRP.Yampa
     integral,
     kSwitch,
     rpSwitchB,
+    pause,
+    delay
   )
 import Graphics.Gloss
   ( Color,
     Display (InWindow),
     Picture (Pictures),
+    Point,
     black,
     blank,
     blue,
@@ -66,12 +70,15 @@ import Graphics.Gloss
   )
 import qualified Graphics.Gloss.Interface.IO.Simulate as S
 
-import qualified Control.Category (Category(..))
+import Control.Category (Category(..))
 
 import Data.Foldable (toList)
-import Data.Sequence (fromList, empty, (|>), (><))
+import Data.Sequence (fromList, empty, index, (|>), (><))
 import qualified Data.Sequence as Seq
 import Data.VectorSpace (VectorSpace)
+import Debug.Trace (trace)
+
+import Prelude hiding (id, (.))
 
 -- class Graphable g where
 --   data f a :: * -> *
@@ -115,31 +122,45 @@ import Data.VectorSpace (VectorSpace)
 --   (.) :: SFP b c -> SFP a b -> SFP a c
 --   (.) = undefined
 
--- newtype SFP a b = SFP (SF (Event (a, Picture)) (Picture, Event (b, Picture)))
+newtype SFP a b = SFP {unSFP :: (SF (Event (a, Picture)) (Picture, Event (b, Picture)))}
 
-integrals :: (Fractional s, VectorSpace a s) => SF (Event [a], Event Int) [a]
-integrals = (constant ()) &&& ins >>> rpSwitchB empty >>^ toList
+type DropN = Int
+type ConcatSFs a b = [SF a b]
+
+eventComp :: Event (a -> a) -> Event (a -> a) -> Event (a -> a)
+eventComp (Event f) (Event g) = Event $ f . g
+eventComp (Event f) NoEvent   = Event f
+eventComp NoEvent   (Event g) = Event g
+eventComp NoEvent   NoEvent   = NoEvent
+
+rpQueueB :: SF (Event (ConcatSFs () b), Event DropN) [b]
+rpQueueB = (constant ()) &&& ins >>> rpSwitchB empty >>^ toList
   where
     ins = arr $ uncurry go
-      where
-        go (Event as) (Event ds) = Event $ (Seq.drop ds) . (adds as)
-        go (Event as) NoEvent    = Event $ adds as
-        go NoEvent    (Event ds) = Event $ Seq.drop ds
-        go NoEvent    NoEvent    = NoEvent
-        adds as = (flip (><)) . (fmap (\v -> constant v >>> integral)) $ fromList as
+    go sfs ds = eventComp (Seq.drop <$> ds) (adds <$> sfs)
+    adds as = (flip (><)) $ fromList as
 
-idAni :: SF (Event (a, Picture)) (Picture)
-idAni = proc e -> do
+idAni :: Double -> Double -> SFP a a
+idAni v d = SFP $ proc e -> do
   rec
-    as <- accumHold empty -< (concat . fst) <$> e
-    ps <- accumHold empty -< (concat . snd) <$> e
-    psp <- integrals -< (e `tag` [50], NoEvent)
-  returnA -< pictures $ zipWith (\x p -> translate x 0 p) psp $ toList ps
+    as  <- accumHold empty -< eventComp (de `tag` Seq.drop 1) $ (concat) <$> e
+    de  <- delay (d/v) NoEvent -< e `tag` 1
+    ps  <- rpQueueB        -< ((element . snd) <$> e, de)
+  returnA -< (pictures $ ps ++ [arrL $ double2Float d], de `tag` (index as 0))
   where
     concat a as = as |> a
+    element :: Picture -> [SF () (Picture)]
+    element p = [constant v >>> integral >>^ double2Float >>^ (\x -> (translate x 0 p))]
 
--- instance Control.Category.Category SFP where
---   id = SFP 
+compAni :: SFP b c -> SFP a b -> SFP a c
+compAni (SFP f) (SFP g) = SFP $ proc e -> do
+  (p, e') <- g -< e
+  (p', e'') <- f -< e'
+  returnA -< (pictures [p, translate 200 0 p'], e'')
+
+instance Control.Category.Category SFP where
+  id = idAni 50 200
+  (.) = compAni
 
 -- arr' :: (a -> b) -> (b -> Picture) -> SFP a b
 
@@ -151,6 +172,12 @@ arrGraph = pictures [ circle 20
                     , polygon [(-80, 0), (-100, -10), (-100, 10)]
                     , polygon [(80, 10), (80, -10), ( 100, 0)]
                     ]
+
+arrL :: Float -> Picture
+arrL d = pictures [ line [(0, 0), (d, 0)]
+                  , polygon [(0, 0), (-20, 10), (-20, -10)]
+                  , polygon [(d, 0), (d-20, 10), (d-20, -10)]
+                  ]
 
 showTime :: SF a Picture
 showTime =
@@ -175,7 +202,14 @@ kSwitchR sf e f = kSwitch sf e cont
 --   (showTime >>^ translate 0 100) >>^ (\(a, b) -> pictures [a, b])
 
 simulation :: SF () Picture
-simulation = repeatedly 2 ((), circle 20) >>> idAni
+simulation = repeatedly 2 ((), circle 20) >>> (unSFP $ id . id) >>^ fst
+
+-- simulation :: SF () Picture
+-- simulation = (pause 0 sfC time) >>^ text . show
+--   where
+--     sfC = proc _ -> do
+--       t <- time -< ()
+--       returnA -< t < 5 || (t > 10 && t < 15)
 
 main :: IO ()
 main =
