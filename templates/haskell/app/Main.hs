@@ -124,6 +124,39 @@ import Prelude hiding (id, (.))
 
 newtype SFP a b = SFP {unSFP :: (SF (Event (a, Picture)) (Picture, Event (b, Picture)))}
 
+data SFP' a b = SFP' {
+  start :: Point,
+  end :: Point,
+  sf :: SF a (b, Event (SF () Picture)),
+  sfp :: SF (Event (SF () Picture)) Picture,
+  inp :: SF a Picture,
+  outp :: SF b Picture
+  }
+
+idSFP' :: (Show a) => Point -> Point -> SFP' a a
+idSFP' s@(sx, sy) e@(ex, ey) = SFP' s e (arr id &&& never) (constant $ line s e) (arr $ (translate sx (sy+10)) . text . show) (arr $ (translate ex (ey+10)) . text . show)
+
+compSFP' :: (Show a, Show b, Show c) => SFP' b c -> SFP' a b -> SFP' a c
+compSFP' f g = SFP' s e sf inp outp
+  where
+    s = start f
+    e = end g
+    sf' :: SF a (c, (Event (SF () Picture), Event (SF () Picture)))
+    sf' = proc a -> do
+      (b, p1) <- sf g -< a
+      (c, p2) <- sf f -< b
+      returnA -< (c, (p1, p2))
+    sf = sf' >>^ fst
+    sfp = sf' >>> proc (_, (p1, p2)) -> do
+      r1 <- sfp g -< p1
+      r2 <- sfp f -< p2
+      returnA -< pictures [r1 r2]
+    inp = 
+
+-- data YampaAni = ID a a
+--               | Comp a b c
+--               | Arr a b
+
 type DropN = Int
 type ConcatSFs a b = [SF a b]
 
