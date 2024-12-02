@@ -31,3 +31,6 @@ cabal.project.local~
 shell.nix
 result
 
+# AOC files
+input
+test*
