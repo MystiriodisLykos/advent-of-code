@@ -3,9 +3,9 @@ import Data.Maybe
 import Text.Regex.Applicative
 import Text.Regex.Applicative.Common (decimal)
 import System.Environment (getArgs)
+import qualified AoC.Common as AoC
 
 type Mul = (Int, Int)
-type Solution = Int
 type Input = String
 
 data Statement = SMul Int Int
@@ -41,12 +41,12 @@ don't = string "don't()" $> Dont
 findAll :: RE a b -> RE a [b]
 findAll re = catMaybes <$> many ((Just <$> re) <|> (Nothing <$ anySym))
 
-part1 :: Input -> Solution
+part1 :: Input -> AoC.Solution
 part1 s = maybe 0 go (match (findAll mul) s)
   where
     go = sum . map (uncurry (*))
 
-part2 :: Input -> Solution
+part2 :: Input -> AoC.Solution
 part2 s = maybe 0 go (match (findAll $ smul <|> do' <|> don't) s)
   where
     go = sum . map (uncurry (*) . unMul) . goDo
@@ -60,11 +60,7 @@ part2 s = maybe 0 go (match (findAll $ smul <|> do' <|> don't) s)
 
 main :: IO ()
 main = do
-  file <- headDef "input" <$> getArgs
-  input <- readFile file
+  input <- AoC.input
   putStrLn $ show $ part1 input
   putStrLn $ show $ part2 input
 
-headDef :: a -> [a] -> a
-headDef a [] = a
-headDef _ (x:_) = x

@@ -1,7 +1,10 @@
 let
   pkgs = import <nixpkgs> { }; # pin the channel to ensure reproducibility!
-  space = pkgs.haskellPackages.developPackage {
+  pkg = pkgs.haskellPackages.developPackage {
     root = ./.;
+    source-overrides = {
+      aoc-common = ../common;
+    };
   };
 in
-space
+pkg

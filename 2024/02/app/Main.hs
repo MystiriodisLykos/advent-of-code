@@ -10,18 +10,14 @@ import Data.Maybe (catMaybes)
 import Data.Monoid (Sum(Sum), First(First))
 import System.Environment (getArgs)
 import Debug.Trace (trace)
+import qualified AoC.Common as AoC
 
 type Input = [[Int]]
-type Solution = Int
 
 toInput :: String -> Input
 toInput = map (map read . words) . lines
 
-headDef :: a -> [a] -> a
-headDef a [] = a
-headDef _ (x:_) = x
-
-part1 :: Input -> Solution
+part1 :: Input -> AoC.Solution
 part1 = length . catMaybes . map (join' . fold1M safe)
   where
     safeJump :: Int -> Int -> Maybe Int
@@ -49,6 +45,5 @@ part1 = length . catMaybes . map (join' . fold1M safe)
 
 main :: IO ()
 main = do
-  file <- headDef "input" <$> getArgs
-  input <- toInput <$> readFile file
+  input <- toInput <$> AoC.input
   putStrLn $ show $ part1 input
